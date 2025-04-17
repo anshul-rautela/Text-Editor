@@ -110,7 +110,7 @@ ListItem list_get_item(List l, int i) {
 }
 
 ListItem list_insert(List l, int idx, void *value) {
-    ListItem new = (ListItem)malloc(sizeof(struct list_item));
+    ListItem new = (ListItem)malloc(sizeof(struct list_item));  
     new->value = value;
     if (idx == 0) {
         new->next = l->first;
