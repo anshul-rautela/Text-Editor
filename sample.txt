@@ -1,4 +1,0 @@
-This is a sample line
-This is a new line
-
-This is a space seperated new line
