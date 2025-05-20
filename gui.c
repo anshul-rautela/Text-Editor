@@ -128,6 +128,7 @@ void on_save(GtkWidget *widget, gpointer window) {
         g_free(text);
         g_free(filename);
     }
+    
     gtk_widget_destroy(dialog);
 }
 
@@ -140,17 +141,52 @@ void on_quit(GtkWidget *widget, gpointer data) {
     }
     gtk_main_quit();
 }
-
 gboolean on_text_view_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    GtkTextIter cursor_iter;
+    gchar open_char = 0;
+    gchar close_char = 0;
+
+    // Auto-close brackets
+    switch (event->keyval) {
+        case GDK_KEY_parenleft:    // (
+            open_char = '('; close_char = ')'; break;
+        case GDK_KEY_bracketleft:  // [
+            open_char = '['; close_char = ']'; break;
+        case GDK_KEY_braceleft:    // {
+            open_char = '{'; close_char = '}'; break;
+        case GDK_KEY_less:         // <
+            open_char = '<'; close_char = '>'; break;
+        default:
+            break; // Continue checking for shortcuts
+    }
+
+    if (open_char != 0 && close_char != 0) {
+        // Insert bracket pair
+        gtk_text_buffer_get_iter_at_mark(buffer, &cursor_iter,
+                                         gtk_text_buffer_get_insert(buffer));
+        gchar text[3] = {open_char, close_char, '\0'};
+        gtk_text_buffer_insert(buffer, &cursor_iter, text, 2);
+
+        // Move cursor between brackets
+        gtk_text_buffer_get_iter_at_mark(buffer, &cursor_iter,
+                                         gtk_text_buffer_get_insert(buffer));
+        gtk_text_iter_backward_char(&cursor_iter);
+        gtk_text_buffer_place_cursor(buffer, &cursor_iter);
+        return TRUE;  // Skip default handling
+    }
+
     // Ctrl+Z for Undo
     if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_z)) {
         on_undo(NULL, NULL);
-        return TRUE; // Stop further handling
+        return TRUE;
     }
+
     // Ctrl+Y for Redo
     if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_y)) {
         on_redo(NULL, NULL);
         return TRUE;
     }
-    return FALSE; // Allow normal processing
+
+    return FALSE; // Let normal keys pass through
 }

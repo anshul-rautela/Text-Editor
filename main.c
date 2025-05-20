@@ -2,6 +2,7 @@
 #include "gui.h"
 #include "piecetable.h"
 #include "undo_redo.h"
+#include "matching.h"
 
 int main(int argc, char *argv[]) {
     GtkWidget *window, *vbox, *menubar;
@@ -77,6 +78,15 @@ int main(int argc, char *argv[]) {
                                    GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
     gtk_container_add(GTK_CONTAINER(scrolled_window), text_view);
     gtk_box_pack_start(GTK_BOX(vbox), scrolled_window, TRUE, TRUE, 0);
+    //bracket matching
+    init_bracket_matching(GTK_TEXT_VIEW(text_view));
+    GtkTextTagTable *tag_table = gtk_text_buffer_get_tag_table(buffer);
+
+    GtkTextTag *tag1 = gtk_text_buffer_create_tag(buffer, "bracket_level_1", "foreground", "blue", NULL);
+    GtkTextTag *tag2 = gtk_text_buffer_create_tag(buffer, "bracket_level_2", "foreground", "green", NULL);
+    GtkTextTag *tag3 = gtk_text_buffer_create_tag(buffer, "bracket_level_3", "foreground", "orange", NULL);
+
+
 
     gtk_widget_show_all(window);
     gtk_main();
