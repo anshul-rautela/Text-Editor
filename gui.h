@@ -22,6 +22,11 @@ void on_open(GtkWidget *widget, gpointer window);
 void on_save(GtkWidget *widget, gpointer window);
 void on_quit(GtkWidget *widget, gpointer data);
 
+// Zoom operations
+void on_zoom_in(GtkWidget *widget, gpointer data);
+void on_zoom_out(GtkWidget *widget, gpointer data);
+void initialize_textview_font_size(void);
+
 // Edit operations
 void on_undo(GtkWidget *widget, gpointer data);
 void on_redo(GtkWidget *widget, gpointer data);

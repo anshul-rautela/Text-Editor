@@ -7,6 +7,7 @@
 #include "window_title.h"
 
 // --- Global Widgets and State ---
+
 static char *current_filename = NULL; // Tracks the current opened/saved file
 
 GtkWidget *text_view = NULL;
@@ -17,6 +18,48 @@ Piecetable doc_piecetable = NULL;
 UndoRedoStack *undo_stack = NULL;
 
 static char *prev_text = NULL;
+
+// For Zoom in and Zoom out
+static int current_font_size = 12; // Default font size
+static GtkCssProvider *zoom_css_provider = NULL;
+
+// Helper to apply the current font size to the text view
+void apply_textview_font_size(int font_size) {
+    if (!zoom_css_provider)
+        zoom_css_provider = gtk_css_provider_new();
+
+    char css[128];
+    snprintf(css, sizeof(css),
+             "textview { font-size: %dpt; }", font_size);
+
+    gtk_css_provider_load_from_data(zoom_css_provider, css, -1, NULL);
+
+    GtkStyleContext *context = gtk_widget_get_style_context(text_view);
+    gtk_style_context_add_provider(context,
+        GTK_STYLE_PROVIDER(zoom_css_provider),
+        GTK_STYLE_PROVIDER_PRIORITY_USER);
+}
+
+// Call this in your main window setup after creating text_view:
+void initialize_textview_font_size() {
+    apply_textview_font_size(current_font_size);
+}
+
+// Handler for Zoom In
+void on_zoom_in(GtkWidget *widget, gpointer data) {
+    if (current_font_size < 48) { // Max font size
+        current_font_size += 2;
+        apply_textview_font_size(current_font_size);
+    }
+}
+
+// Handler for Zoom Out
+void on_zoom_out(GtkWidget *widget, gpointer data) {
+    if (current_font_size > 6) { // Min font size
+        current_font_size -= 2;
+        apply_textview_font_size(current_font_size);
+    }
+}
 
 // For search results navigation
 static SearchResults current_results = {0};
@@ -87,15 +130,18 @@ void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
 void on_new(GtkWidget *widget, gpointer data) {
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
     gtk_text_buffer_set_text(buffer, "", -1);
-    if (doc_piecetable != NULL) {
+
+    if (doc_piecetable != NULL)
         piecetable_free(doc_piecetable);
-    }
+
     doc_piecetable = piecetable_create("");
+
     // Free and reset filename
     if (current_filename) {
         g_free(current_filename);
         current_filename = NULL;
     }
+
     update_window_title(GTK_WINDOW(data), NULL); // Show "Untitled"
 }
 
@@ -118,14 +164,18 @@ void on_open(GtkWidget *widget, gpointer window) {
         if (g_file_get_contents(filename, &contents, &length, &error)) {
             buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
             gtk_text_buffer_set_text(buffer, contents, -1);
-            if (doc_piecetable != NULL) {
+
+            if (doc_piecetable != NULL)
                 piecetable_free(doc_piecetable);
-            }
+
             doc_piecetable = piecetable_create(contents);
+
             // Store filename
             if (current_filename) g_free(current_filename);
             current_filename = g_strdup(filename);
+
             update_window_title(GTK_WINDOW(window), current_filename); // Update title
+
             g_free(contents);
         } else {
             g_print("Error reading file: %s\n", error->message);
@@ -135,7 +185,6 @@ void on_open(GtkWidget *widget, gpointer window) {
     }
     gtk_widget_destroy(dialog);
 }
-
 
 void on_save(GtkWidget *widget, gpointer window) {
     GtkWidget *dialog;
@@ -155,6 +204,7 @@ void on_save(GtkWidget *widget, gpointer window) {
         buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
         gtk_text_buffer_get_bounds(buffer, &start, &end);
         text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
+
         if (!g_file_set_contents(filename, text, -1, NULL)) {
             g_print("Error saving file!\n");
         } else {
@@ -163,12 +213,12 @@ void on_save(GtkWidget *widget, gpointer window) {
             current_filename = g_strdup(filename);
             update_window_title(GTK_WINDOW(window), current_filename);
         }
+
         g_free(text);
         g_free(filename);
     }
     gtk_widget_destroy(dialog);
 }
-
 
 void on_quit(GtkWidget *widget, gpointer data) {
     if (doc_piecetable != NULL)
