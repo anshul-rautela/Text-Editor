@@ -1,63 +1,63 @@
 #include <gtk/gtk.h>
 #include <string.h>
 #include "gui.h"
-#include <gdk/gdkkeysyms.h>
-    GtkWidget *text_view = NULL;
+#include "piecetable.h"
+#include "search.h"
+#include "undo_redo.h"
+
+// --- Global Widgets and State ---
+GtkWidget *text_view = NULL;
+GtkWidget *search_bar = NULL;
+GtkWidget *search_entry = NULL;
+
 Piecetable doc_piecetable = NULL;
 UndoRedoStack *undo_stack = NULL;
+
 static char *prev_text = NULL;
 
-void update_piece_table_from_buffer(void)
-{
+// For search results navigation
+static SearchResults current_results = {0};
+static int current_match = -1;
+
+// --- Utility Functions ---
+
+void update_piece_table_from_buffer(void) {
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
     GtkTextIter start, end;
     gtk_text_buffer_get_bounds(buffer, &start, &end);
     char *text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
 
     if (doc_piecetable != NULL)
-    {
         piecetable_free(doc_piecetable);
-    }
+
     doc_piecetable = piecetable_create(text);
     g_free(text);
 }
-void on_begin_user_action(GtkTextBuffer *buffer, gpointer user_data)
-{
+
+// --- Undo/Redo Integration ---
+
+void on_begin_user_action(GtkTextBuffer *buffer, gpointer user_data) {
     GtkTextIter start, end;
     gtk_text_buffer_get_bounds(buffer, &start, &end);
     prev_text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
 }
 
-void on_end_user_action(GtkTextBuffer *buffer, gpointer user_data)
-{
+void on_end_user_action(GtkTextBuffer *buffer, gpointer user_data) {
     GtkTextIter start, end;
     gtk_text_buffer_get_bounds(buffer, &start, &end);
     char *new_text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
 
     if (prev_text)
-    {
         undo_redo_push(undo_stack, prev_text, new_text);
-        g_free(prev_text);
-        prev_text = NULL;
-    }
+
+    g_free(prev_text);
+    prev_text = NULL;
     g_free(new_text);
 }
 
-void on_undo(GtkWidget *widget, gpointer data)
-{
+void on_undo(GtkWidget *widget, gpointer data) {
     const char *text = undo_redo_undo(undo_stack);
-    if (text)
-        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
-        g_signal_handlers_block_by_func(buffer, on_buffer_changed, NULL);
-        gtk_text_buffer_set_text(buffer, text, -1);
-        g_signal_handlers_unblock_by_func(buffer, on_buffer_changed, NULL);
-}
-
-void on_redo(GtkWidget *widget, gpointer data)
-{
-    const char *text = undo_redo_redo(undo_stack);
-    if (text)
-    {
+    if (text) {
         GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
         g_signal_handlers_block_by_func(buffer, on_buffer_changed, NULL);
         gtk_text_buffer_set_text(buffer, text, -1);
@@ -65,24 +65,32 @@ void on_redo(GtkWidget *widget, gpointer data)
     }
 }
 
-void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data)
-{
+void on_redo(GtkWidget *widget, gpointer data) {
+    const char *text = undo_redo_redo(undo_stack);
+    if (text) {
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+        g_signal_handlers_block_by_func(buffer, on_buffer_changed, NULL);
+        gtk_text_buffer_set_text(buffer, text, -1);
+        g_signal_handlers_unblock_by_func(buffer, on_buffer_changed, NULL);
+    }
+}
+
+void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
     update_piece_table_from_buffer();
 }
 
-void on_new(GtkWidget *widget, gpointer data)
-{
+// --- File Operations ---
+
+void on_new(GtkWidget *widget, gpointer data) {
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
     gtk_text_buffer_set_text(buffer, "", -1);
+
     if (doc_piecetable != NULL)
-    {
         piecetable_free(doc_piecetable);
-    }
     doc_piecetable = piecetable_create("");
 }
 
-void on_open(GtkWidget *widget, gpointer window)
-{
+void on_open(GtkWidget *widget, gpointer window) {
     GtkWidget *dialog;
     GtkTextBuffer *buffer;
     gchar *contents = NULL;
@@ -90,28 +98,24 @@ void on_open(GtkWidget *widget, gpointer window)
     GError *error = NULL;
 
     dialog = gtk_file_chooser_dialog_new("Open File",
-                                         GTK_WINDOW(window),
-                                         GTK_FILE_CHOOSER_ACTION_OPEN,
-                                         "_Cancel", GTK_RESPONSE_CANCEL,
-                                         "_Open", GTK_RESPONSE_ACCEPT,
-                                         NULL);
+        GTK_WINDOW(window),
+        GTK_FILE_CHOOSER_ACTION_OPEN,
+        "_Cancel", GTK_RESPONSE_CANCEL,
+        "_Open", GTK_RESPONSE_ACCEPT,
+        NULL);
 
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
-    {
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
         char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-        if (g_file_get_contents(filename, &contents, &length, &error))
-        {
+        if (g_file_get_contents(filename, &contents, &length, &error)) {
             buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
             gtk_text_buffer_set_text(buffer, contents, -1);
+
             if (doc_piecetable != NULL)
-            {
                 piecetable_free(doc_piecetable);
-            }
             doc_piecetable = piecetable_create(contents);
+
             g_free(contents);
-        }
-        else
-        {
+        } else {
             g_print("Error reading file: %s\n", error->message);
             g_clear_error(&error);
         }
@@ -120,104 +124,79 @@ void on_open(GtkWidget *widget, gpointer window)
     gtk_widget_destroy(dialog);
 }
 
-void on_save(GtkWidget *widget, gpointer window)
-{
+void on_save(GtkWidget *widget, gpointer window) {
     GtkWidget *dialog;
     GtkTextBuffer *buffer;
     GtkTextIter start, end;
     gchar *text;
 
     dialog = gtk_file_chooser_dialog_new("Save File",
-                                         GTK_WINDOW(window),
-                                         GTK_FILE_CHOOSER_ACTION_SAVE,
-                                         "_Cancel", GTK_RESPONSE_CANCEL,
-                                         "_Save", GTK_RESPONSE_ACCEPT,
-                                         NULL);
+        GTK_WINDOW(window),
+        GTK_FILE_CHOOSER_ACTION_SAVE,
+        "_Cancel", GTK_RESPONSE_CANCEL,
+        "_Save", GTK_RESPONSE_ACCEPT,
+        NULL);
 
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
-    {
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
         char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
         buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
         gtk_text_buffer_get_bounds(buffer, &start, &end);
         text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
+
         if (!g_file_set_contents(filename, text, -1, NULL))
-        {
             g_print("Error saving file!\n");
-        }
+
         g_free(text);
         g_free(filename);
     }
-
     gtk_widget_destroy(dialog);
 }
 
-void on_quit(GtkWidget *widget, gpointer data)
-{
+void on_quit(GtkWidget *widget, gpointer data) {
     if (doc_piecetable != NULL)
-    {
         piecetable_free(doc_piecetable);
-    }
     if (undo_stack != NULL)
-    {
         undo_redo_stack_free(undo_stack);
-    }
     gtk_main_quit();
 }
 
-gboolean on_text_view_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
-{
-    // Ctrl+Z for Undo
-    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_z))
-    {
-        on_undo(NULL, NULL);
-        return TRUE; // Stop further handling
-    }
-    // Ctrl+Y for Redo
-    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_y))
-    {
-        on_redo(NULL, NULL);
-        return TRUE;
-    }
-    return FALSE; // Allow normal processing
-}
+// --- Search Integration ---
 
-/* ---- KMP Search Integration ---- */
-
-void show_search_bar(GtkWidget *widget, gpointer data)
-{
+void show_search_bar(GtkWidget *widget, gpointer data) {
     gtk_search_bar_set_search_mode(GTK_SEARCH_BAR(search_bar), TRUE);
     gtk_widget_grab_focus(GTK_WIDGET(search_entry));
 }
 
-void on_search_text_changed(GtkEntry *entry, gpointer user_data)
-{
+void on_search_text_changed(GtkEntry *entry, gpointer user_data) {
     const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
     search_results_free(&current_results);
 
-    if (strlen(text) > 0)
-    {
+    if (strlen(text) > 0) {
         current_results = kmp_search(text, doc_piecetable);
         current_match = current_results.count > 0 ? 0 : -1;
+    } else {
+        current_match = -1;
+    }
 
-        if (current_match != -1)
-        {
-            GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
-            int match_offset = current_results.indices[current_match];
-            int match_length = strlen(gtk_entry_get_text(entry));
+    if (current_match != -1) {
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+        int match_offset = current_results.indices[current_match];
+        int match_length = strlen(gtk_entry_get_text(entry));
 
-            GtkTextIter match_start, match_end;
-            gtk_text_buffer_get_iter_at_offset(buffer, &match_start, match_offset);
-            match_end = match_start;
-            gtk_text_iter_forward_chars(&match_end, match_length);
+        GtkTextIter match_start, match_end;
+        gtk_text_buffer_get_iter_at_offset(buffer, &match_start, match_offset);
+        match_end = match_start;
+        gtk_text_iter_forward_chars(&match_end, match_length);
 
-            gtk_text_buffer_select_range(buffer, &match_start, &match_end);
-            gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(text_view), &match_start, 0.0, FALSE, 0.0, 0.0);
-        }
+        gtk_text_buffer_select_range(buffer, &match_start, &match_end);
+        gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(text_view), &match_start, 0.0, FALSE, 0.0, 0.0);
     }
 }
 
-void on_next_match(GtkWidget *widget, gpointer data)
-{
+void on_next_match(GtkWidget *widget, gpointer data) {
+    if (current_results.count == 0) return;
+    current_match = (current_match + 1) % current_results.count;
+
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
     int match_offset = current_results.indices[current_match];
     int match_length = strlen(gtk_entry_get_text(GTK_ENTRY(search_entry)));
@@ -231,8 +210,10 @@ void on_next_match(GtkWidget *widget, gpointer data)
     gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(text_view), &match_start, 0.0, FALSE, 0.0, 0.0);
 }
 
-void on_previous_match(GtkWidget *widget, gpointer data)
-{
+void on_previous_match(GtkWidget *widget, gpointer data) {
+    if (current_results.count == 0) return;
+    current_match = (current_match - 1 + current_results.count) % current_results.count;
+
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
     int match_offset = current_results.indices[current_match];
     int match_length = strlen(gtk_entry_get_text(GTK_ENTRY(search_entry)));
@@ -245,65 +226,54 @@ void on_previous_match(GtkWidget *widget, gpointer data)
     gtk_text_buffer_select_range(buffer, &match_start, &match_end);
     gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(text_view), &match_start, 0.0, FALSE, 0.0, 0.0);
 }
-    gboolean on_text_view_key_press(GtkWidget * widget, GdkEventKey * event, gpointer user_data)
-    {
-        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
-        GtkTextIter cursor_iter;
-        gchar open_char = 0;
-        gchar close_char = 0;
 
-        // Auto-close brackets
-        switch (event->keyval)
-        {
-        case GDK_KEY_parenleft: // (
-            open_char = '(';
-            close_char = ')';
-            break;
-        case GDK_KEY_bracketleft: // [
-            open_char = '[';
-            close_char = ']';
-            break;
-        case GDK_KEY_braceleft: // {
-            open_char = '{';
-            close_char = '}';
-            break;
-        case GDK_KEY_less: // <
-            open_char = '<';
-            close_char = '>';
-            break;
-        default:
-            break; // Continue checking for shortcuts
-        }
+// --- Key Press Handler (Undo/Redo, Bracket Auto-close, Search) ---
 
-        if (open_char != 0 && close_char != 0)
-        {
-            // Insert bracket pair
-            gtk_text_buffer_get_iter_at_mark(buffer, &cursor_iter,
-                                             gtk_text_buffer_get_insert(buffer));
-            gchar text[3] = {open_char, close_char, '\0'};
-            gtk_text_buffer_insert(buffer, &cursor_iter, text, 2);
+gboolean on_text_view_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    GtkTextIter cursor_iter;
+    gchar open_char = 0;
+    gchar close_char = 0;
 
-            // Move cursor between brackets
-            gtk_text_buffer_get_iter_at_mark(buffer, &cursor_iter,
-                                             gtk_text_buffer_get_insert(buffer));
-            gtk_text_iter_backward_char(&cursor_iter);
-            gtk_text_buffer_place_cursor(buffer, &cursor_iter);
-            return TRUE; // Skip default handling
-        }
-
-        // Ctrl+Z for Undo
-        if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_z))
-        {
-            on_undo(NULL, NULL);
-            return TRUE;
-        }
-
-        // Ctrl+Y for Redo
-        if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_y))
-        {
-            on_redo(NULL, NULL);
-            return TRUE;
-        }
-
-        return FALSE; // Let normal keys pass through
+    // Auto-close brackets
+    switch (event->keyval) {
+        case GDK_KEY_parenleft: open_char = '('; close_char = ')'; break;
+        case GDK_KEY_bracketleft: open_char = '['; close_char = ']'; break;
+        case GDK_KEY_braceleft: open_char = '{'; close_char = '}'; break;
+        case GDK_KEY_less: open_char = '<'; close_char = '>'; break;
+        default: break;
     }
+
+    if (open_char != 0 && close_char != 0) {
+        gtk_text_buffer_get_iter_at_mark(buffer, &cursor_iter, gtk_text_buffer_get_insert(buffer));
+        gchar text[3] = {open_char, close_char, '\0'};
+        gtk_text_buffer_insert(buffer, &cursor_iter, text, 2);
+
+        // Move cursor between brackets
+        gtk_text_buffer_get_iter_at_mark(buffer, &cursor_iter, gtk_text_buffer_get_insert(buffer));
+        gtk_text_iter_backward_char(&cursor_iter);
+        gtk_text_buffer_place_cursor(buffer, &cursor_iter);
+
+        return TRUE; // Skip default handling
+    }
+
+    // Ctrl+F: Show search bar
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_f)) {
+        show_search_bar(NULL, NULL);
+        return TRUE;
+    }
+
+    // Ctrl+Z: Undo
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_z)) {
+        on_undo(NULL, NULL);
+        return TRUE;
+    }
+
+    // Ctrl+Y: Redo
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_y)) {
+        on_redo(NULL, NULL);
+        return TRUE;
+    }
+
+    return FALSE; // Let normal keys pass through
+}
