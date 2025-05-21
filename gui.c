@@ -2,17 +2,10 @@
 #include <string.h>
 #include "gui.h"
 #include <gdk/gdkkeysyms.h>
-
-GtkWidget *text_view = NULL;
+    GtkWidget *text_view = NULL;
 Piecetable doc_piecetable = NULL;
 UndoRedoStack *undo_stack = NULL;
 static char *prev_text = NULL;
-
-// Search widgets and state
-GtkWidget *search_bar = NULL;
-GtkWidget *search_entry = NULL;
-SearchResults current_results;
-static int current_match = -1;
 
 void update_piece_table_from_buffer(void)
 {
@@ -28,7 +21,6 @@ void update_piece_table_from_buffer(void)
     doc_piecetable = piecetable_create(text);
     g_free(text);
 }
-
 void on_begin_user_action(GtkTextBuffer *buffer, gpointer user_data)
 {
     GtkTextIter start, end;
@@ -55,12 +47,10 @@ void on_undo(GtkWidget *widget, gpointer data)
 {
     const char *text = undo_redo_undo(undo_stack);
     if (text)
-    {
         GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
         g_signal_handlers_block_by_func(buffer, on_buffer_changed, NULL);
         gtk_text_buffer_set_text(buffer, text, -1);
         g_signal_handlers_unblock_by_func(buffer, on_buffer_changed, NULL);
-    }
 }
 
 void on_redo(GtkWidget *widget, gpointer data)
@@ -157,6 +147,7 @@ void on_save(GtkWidget *widget, gpointer window)
         g_free(text);
         g_free(filename);
     }
+
     gtk_widget_destroy(dialog);
 }
 
@@ -254,3 +245,65 @@ void on_previous_match(GtkWidget *widget, gpointer data)
     gtk_text_buffer_select_range(buffer, &match_start, &match_end);
     gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(text_view), &match_start, 0.0, FALSE, 0.0, 0.0);
 }
+    gboolean on_text_view_key_press(GtkWidget * widget, GdkEventKey * event, gpointer user_data)
+    {
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+        GtkTextIter cursor_iter;
+        gchar open_char = 0;
+        gchar close_char = 0;
+
+        // Auto-close brackets
+        switch (event->keyval)
+        {
+        case GDK_KEY_parenleft: // (
+            open_char = '(';
+            close_char = ')';
+            break;
+        case GDK_KEY_bracketleft: // [
+            open_char = '[';
+            close_char = ']';
+            break;
+        case GDK_KEY_braceleft: // {
+            open_char = '{';
+            close_char = '}';
+            break;
+        case GDK_KEY_less: // <
+            open_char = '<';
+            close_char = '>';
+            break;
+        default:
+            break; // Continue checking for shortcuts
+        }
+
+        if (open_char != 0 && close_char != 0)
+        {
+            // Insert bracket pair
+            gtk_text_buffer_get_iter_at_mark(buffer, &cursor_iter,
+                                             gtk_text_buffer_get_insert(buffer));
+            gchar text[3] = {open_char, close_char, '\0'};
+            gtk_text_buffer_insert(buffer, &cursor_iter, text, 2);
+
+            // Move cursor between brackets
+            gtk_text_buffer_get_iter_at_mark(buffer, &cursor_iter,
+                                             gtk_text_buffer_get_insert(buffer));
+            gtk_text_iter_backward_char(&cursor_iter);
+            gtk_text_buffer_place_cursor(buffer, &cursor_iter);
+            return TRUE; // Skip default handling
+        }
+
+        // Ctrl+Z for Undo
+        if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_z))
+        {
+            on_undo(NULL, NULL);
+            return TRUE;
+        }
+
+        // Ctrl+Y for Redo
+        if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_y))
+        {
+            on_redo(NULL, NULL);
+            return TRUE;
+        }
+
+        return FALSE; // Let normal keys pass through
+    }
