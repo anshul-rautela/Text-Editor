@@ -3,7 +3,7 @@
 #include "piecetable.h"
 #include "undo_redo.h"
 #include "search.h"
-
+#include "window_title.h" 
 #include "matching.h"
 
 int main(int argc, char *argv[]) {
