@@ -4,8 +4,11 @@
 #include "piecetable.h"
 #include "search.h"
 #include "undo_redo.h"
+#include "window_title.h"
 
 // --- Global Widgets and State ---
+static char *current_filename = NULL; // Tracks the current opened/saved file
+
 GtkWidget *text_view = NULL;
 GtkWidget *search_bar = NULL;
 GtkWidget *search_entry = NULL;
@@ -84,10 +87,16 @@ void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
 void on_new(GtkWidget *widget, gpointer data) {
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
     gtk_text_buffer_set_text(buffer, "", -1);
-
-    if (doc_piecetable != NULL)
+    if (doc_piecetable != NULL) {
         piecetable_free(doc_piecetable);
+    }
     doc_piecetable = piecetable_create("");
+    // Free and reset filename
+    if (current_filename) {
+        g_free(current_filename);
+        current_filename = NULL;
+    }
+    update_window_title(GTK_WINDOW(data), NULL); // Show "Untitled"
 }
 
 void on_open(GtkWidget *widget, gpointer window) {
@@ -109,11 +118,14 @@ void on_open(GtkWidget *widget, gpointer window) {
         if (g_file_get_contents(filename, &contents, &length, &error)) {
             buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
             gtk_text_buffer_set_text(buffer, contents, -1);
-
-            if (doc_piecetable != NULL)
+            if (doc_piecetable != NULL) {
                 piecetable_free(doc_piecetable);
+            }
             doc_piecetable = piecetable_create(contents);
-
+            // Store filename
+            if (current_filename) g_free(current_filename);
+            current_filename = g_strdup(filename);
+            update_window_title(GTK_WINDOW(window), current_filename); // Update title
             g_free(contents);
         } else {
             g_print("Error reading file: %s\n", error->message);
@@ -123,6 +135,7 @@ void on_open(GtkWidget *widget, gpointer window) {
     }
     gtk_widget_destroy(dialog);
 }
+
 
 void on_save(GtkWidget *widget, gpointer window) {
     GtkWidget *dialog;
@@ -142,15 +155,20 @@ void on_save(GtkWidget *widget, gpointer window) {
         buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
         gtk_text_buffer_get_bounds(buffer, &start, &end);
         text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
-
-        if (!g_file_set_contents(filename, text, -1, NULL))
+        if (!g_file_set_contents(filename, text, -1, NULL)) {
             g_print("Error saving file!\n");
-
+        } else {
+            // Store filename and update title
+            if (current_filename) g_free(current_filename);
+            current_filename = g_strdup(filename);
+            update_window_title(GTK_WINDOW(window), current_filename);
+        }
         g_free(text);
         g_free(filename);
     }
     gtk_widget_destroy(dialog);
 }
+
 
 void on_quit(GtkWidget *widget, gpointer data) {
     if (doc_piecetable != NULL)
