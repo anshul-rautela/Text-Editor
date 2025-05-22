@@ -19,7 +19,7 @@ UndoRedoStack *undo_stack = NULL;
 
 static char *prev_text = NULL;
 
-// For Zoom in and Zoom out
+// -----For Zoom in and Zoom out------
 static int current_font_size = 12; // Default font size
 static GtkCssProvider *zoom_css_provider = NULL;
 
@@ -40,7 +40,6 @@ void apply_textview_font_size(int font_size) {
         GTK_STYLE_PROVIDER_PRIORITY_USER);
 }
 
-// Call this in your main window setup after creating text_view:
 void initialize_textview_font_size() {
     apply_textview_font_size(current_font_size);
 }
@@ -128,22 +127,54 @@ void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
 // --- File Operations ---
 
 void on_new(GtkWidget *widget, gpointer data) {
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
-    gtk_text_buffer_set_text(buffer, "", -1);
+    GtkWidget *dialog;
+    GtkFileChooser *chooser;
+    GtkTextBuffer *buffer;
+    gchar *filename = NULL;
+    GError *error = NULL;
 
-    if (doc_piecetable != NULL)
-        piecetable_free(doc_piecetable);
+    dialog = gtk_file_chooser_dialog_new("Create New File",
+                                         GTK_WINDOW(data),
+                                         GTK_FILE_CHOOSER_ACTION_SAVE,
+                                         "_Cancel", GTK_RESPONSE_CANCEL,
+                                         "_Create", GTK_RESPONSE_ACCEPT,
+                                         NULL);
 
-    doc_piecetable = piecetable_create("");
+    chooser = GTK_FILE_CHOOSER(dialog);
+    gtk_file_chooser_set_do_overwrite_confirmation(chooser, TRUE);
 
-    // Free and reset filename
-    if (current_filename) {
-        g_free(current_filename);
-        current_filename = NULL;
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+        filename = gtk_file_chooser_get_filename(chooser);
+
+        // Try creating an empty file
+        if (!g_file_set_contents(filename, "", 0, &error)) {
+            g_printerr("Error creating file: %s\n", error->message);
+            g_clear_error(&error);
+        } else {
+            // Clear the text buffer
+            buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+            gtk_text_buffer_set_text(buffer, "", -1);
+
+            // Free and reset the piece table
+            if (doc_piecetable != NULL)
+                piecetable_free(doc_piecetable);
+            doc_piecetable = piecetable_create("");
+
+            // Free and update filename
+            if (current_filename)
+                g_free(current_filename);
+            current_filename = g_strdup(filename);
+
+            update_window_title(GTK_WINDOW(data), current_filename);
+        }
+
+        g_free(filename);
     }
 
-    update_window_title(GTK_WINDOW(data), NULL); // Show "Untitled"
+    gtk_widget_destroy(dialog);
 }
+
+
 
 void on_open(GtkWidget *widget, gpointer window) {
     GtkWidget *dialog;
@@ -187,38 +218,51 @@ void on_open(GtkWidget *widget, gpointer window) {
 }
 
 void on_save(GtkWidget *widget, gpointer window) {
-    GtkWidget *dialog;
     GtkTextBuffer *buffer;
     GtkTextIter start, end;
     gchar *text;
 
-    dialog = gtk_file_chooser_dialog_new("Save File",
-        GTK_WINDOW(window),
-        GTK_FILE_CHOOSER_ACTION_SAVE,
-        "_Cancel", GTK_RESPONSE_CANCEL,
-        "_Save", GTK_RESPONSE_ACCEPT,
-        NULL);
+    buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+    gtk_text_buffer_get_bounds(buffer, &start, &end);
+    text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
 
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
-        char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-        buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
-        gtk_text_buffer_get_bounds(buffer, &start, &end);
-        text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
-
-        if (!g_file_set_contents(filename, text, -1, NULL)) {
+    if (current_filename) {
+        // Save to the current file
+        if (!g_file_set_contents(current_filename, text, -1, NULL)) {
             g_print("Error saving file!\n");
         } else {
-            // Store filename and update title
-            if (current_filename) g_free(current_filename);
-            current_filename = g_strdup(filename);
             update_window_title(GTK_WINDOW(window), current_filename);
         }
+    } else {
+        // No file yet: prompt user to choose a file
+        GtkWidget *dialog = gtk_file_chooser_dialog_new("Save File",
+            GTK_WINDOW(window),
+            GTK_FILE_CHOOSER_ACTION_SAVE,
+            "_Cancel", GTK_RESPONSE_CANCEL,
+            "_Save", GTK_RESPONSE_ACCEPT,
+            NULL);
 
-        g_free(text);
-        g_free(filename);
+        GtkFileChooser *chooser = GTK_FILE_CHOOSER(dialog);
+        gtk_file_chooser_set_do_overwrite_confirmation(chooser, TRUE);
+        gtk_file_chooser_set_current_name(chooser, "Untitled.txt");
+
+        if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+            char *filename = gtk_file_chooser_get_filename(chooser);
+            if (!g_file_set_contents(filename, text, -1, NULL)) {
+                g_print("Error saving file!\n");
+            } else {
+                // Store filename and update title
+                if (current_filename) g_free(current_filename);
+                current_filename = g_strdup(filename);
+                update_window_title(GTK_WINDOW(window), current_filename);
+            }
+            g_free(filename);
+        }
+        gtk_widget_destroy(dialog);
     }
-    gtk_widget_destroy(dialog);
+    g_free(text);
 }
+
 
 void on_quit(GtkWidget *widget, gpointer data) {
     if (doc_piecetable != NULL)
