@@ -339,6 +339,13 @@ void on_previous_match(GtkWidget *widget, gpointer data) {
     gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(text_view), &match_start, 0.0, FALSE, 0.0, 0.0);
 }
 
+
+void on_search_bar_close(GtkSearchBar *search_bar, gpointer user_data) {
+    gtk_search_bar_set_search_mode(search_bar, FALSE);
+}
+
+
+
 // --- Key Press Handler (Undo/Redo, Bracket Auto-close, Search) ---
 
 gboolean on_text_view_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
@@ -386,6 +393,14 @@ gboolean on_text_view_key_press(GtkWidget *widget, GdkEventKey *event, gpointer 
         on_redo(NULL, NULL);
         return TRUE;
     }
+
+    // Ctrl+S: Save
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_s)) {
+    on_save(NULL, gtk_widget_get_toplevel(widget));
+    return TRUE;
+    }
+
+
 
     return FALSE; // Let normal keys pass through
 }

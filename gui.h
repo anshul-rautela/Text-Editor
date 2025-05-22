@@ -21,7 +21,7 @@ void on_new(GtkWidget *widget, gpointer data);
 void on_open(GtkWidget *widget, gpointer window);
 void on_save(GtkWidget *widget, gpointer window);
 void on_quit(GtkWidget *widget, gpointer data);
-
+void on_search_bar_close(GtkSearchBar *search_bar, gpointer user_data);
 // Zoom operations
 void on_zoom_in(GtkWidget *widget, gpointer data);
 void on_zoom_out(GtkWidget *widget, gpointer data);

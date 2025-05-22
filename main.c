@@ -6,7 +6,8 @@
 #include "window_title.h"
 #include "matching.h"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     GtkWidget *window, *vbox, *menubar;
     GtkWidget *file_menu, *file_item;
     GtkWidget *edit_menu, *edit_item;
@@ -118,6 +119,8 @@ int main(int argc, char *argv[]) {
     g_signal_connect(search_next, "clicked", G_CALLBACK(on_next_match), NULL);
 
     gtk_box_pack_start(GTK_BOX(vbox), search_bar, FALSE, FALSE, 0);
+    gtk_search_bar_set_show_close_button(GTK_SEARCH_BAR(search_bar), TRUE);
+    g_signal_connect(search_bar, "close", G_CALLBACK(on_search_bar_close), NULL);
 
     // --- Text view and scroll ---
     text_view = gtk_text_view_new();
