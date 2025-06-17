@@ -119,6 +119,30 @@ void on_redo(GtkWidget *widget, gpointer data) {
         g_signal_handlers_unblock_by_func(buffer, on_buffer_changed, NULL);
     }
 }
+// This is done to select text for individual font size change
+void apply_font_size_to_selection(GtkTextBuffer *buffer, int font_size) {
+    GtkTextIter start, end;
+    if (!gtk_text_buffer_get_selection_bounds(buffer, &start, &end))
+        return;
+
+    // Create a unique tag for this font size if not already created
+    char tag_name[32];
+    snprintf(tag_name, sizeof(tag_name), "font_%d", font_size);
+
+    GtkTextTagTable *tag_table = gtk_text_buffer_get_tag_table(buffer);
+    GtkTextTag *tag = gtk_text_tag_table_lookup(tag_table, tag_name);
+
+    if (!tag) {
+        tag = gtk_text_buffer_create_tag(buffer, tag_name, "font", NULL, NULL);
+
+        char font_desc[64];
+        snprintf(font_desc, sizeof(font_desc), "Monospace %d", font_size);
+        g_object_set(tag, "font", font_desc, NULL);
+    }
+
+    gtk_text_buffer_apply_tag(buffer, tag, &start, &end);
+}
+
 
 void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
     update_piece_table_from_buffer();
@@ -399,6 +423,67 @@ gboolean on_text_view_key_press(GtkWidget *widget, GdkEventKey *event, gpointer 
     on_save(NULL, gtk_widget_get_toplevel(widget));
     return TRUE;
     }
+
+        // Ctrl+1 → font size 10
+if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_1)) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    apply_font_size_to_selection(buffer, 10);
+    return TRUE;
+}
+
+// Ctrl+2 → font size 15
+if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_2)) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    apply_font_size_to_selection(buffer, 15);
+    return TRUE;
+}
+
+// Ctrl+3 → font size 20
+if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_3)) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    apply_font_size_to_selection(buffer, 20);
+    return TRUE;
+}
+
+// Ctrl+4 → font size 30
+if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_4)) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    apply_font_size_to_selection(buffer, 30);
+    return TRUE;
+}
+
+// Ctrl+5 → font size 40
+if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_5)) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    apply_font_size_to_selection(buffer, 30);
+    return TRUE;
+}
+
+// Ctrl+6 → font size 50
+if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_6)) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    apply_font_size_to_selection(buffer, 50);
+    return TRUE;
+}
+
+// Ctrl+7 → font size 60
+if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_7)) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    apply_font_size_to_selection(buffer, 30);
+    return TRUE;
+}
+// Ctrl+8 → font size 70
+if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_8)) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    apply_font_size_to_selection(buffer, 30);
+    return TRUE;
+}
+// Ctrl+9 → font size 80
+if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_9)) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    apply_font_size_to_selection(buffer, 80);
+    return TRUE;
+}
 
 
 
