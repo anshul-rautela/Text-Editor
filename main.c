@@ -5,6 +5,11 @@
 #include "search.h"
 #include "window_title.h"
 #include "matching.h"
+#include "text_color.h"
+
+// Forward declaration
+static void on_color_menu_activate(GtkMenuItem *item, gpointer user_data);
+
 
 int main(int argc, char *argv[])
 {
@@ -64,13 +69,13 @@ int main(int argc, char *argv[])
 
     undo_item = gtk_menu_item_new_with_label("Undo");
     redo_item = gtk_menu_item_new_with_label("Redo");
-
+    GtkWidget *color_item = gtk_menu_item_new_with_label("Set Text Color");
     g_signal_connect(undo_item, "activate", G_CALLBACK(on_undo), NULL);
     g_signal_connect(redo_item, "activate", G_CALLBACK(on_redo), NULL);
 
     gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), undo_item);
     gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), redo_item);
-
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), color_item);
     gtk_menu_shell_append(GTK_MENU_SHELL(menubar), edit_item);
 
     // --- View menu (Zoom In/Out) ---
@@ -142,7 +147,7 @@ int main(int argc, char *argv[])
     g_signal_connect(buffer, "begin-user-action", G_CALLBACK(on_begin_user_action), NULL);
     g_signal_connect(buffer, "end-user-action", G_CALLBACK(on_end_user_action), NULL);
     g_signal_connect(buffer, "changed", G_CALLBACK(on_buffer_changed), NULL);
-
+    g_signal_connect(color_item, "activate", G_CALLBACK(on_color_menu_activate), text_view);
     scrolled_window = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled_window),
                                    GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
@@ -165,4 +170,11 @@ int main(int argc, char *argv[])
     gtk_main();
 
     return 0;
+}
+
+
+static void on_color_menu_activate(GtkMenuItem *item, gpointer user_data)
+{
+    GtkTextView *text_view = GTK_TEXT_VIEW(user_data);
+    prompt_and_apply_color(text_view);
 }
