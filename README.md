@@ -32,7 +32,7 @@ sudo apt install libgtk-3-dev
 
  4. Compile the code
 ```bash
-gcc list.c piecetable.c undo_redo.c gui.c window_title.c matching.c search.c main.c `pkg-config --cflags gtk+-3.0` -o editor `pkg-config --libs gtk+-3.0`
+gcc list.c piecetable.c undo_redo.c gui.c window_title.c matching.c search.c text_color.c main.c `pkg-config --cflags gtk+-3.0` -o editor `pkg-config --libs gtk+-3.0`
 
 ```
 
