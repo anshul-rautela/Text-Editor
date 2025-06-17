@@ -47,5 +47,6 @@ void setup_parenthesis_matching(GtkWidget *text_view, GtkTextBuffer *buffer);
 void on_mark_set(GtkTextBuffer *buffer, GtkTextIter *location, GtkTextMark *mark, gpointer data);
 void find_matching_opening_bracket(GtkTextBuffer *buffer, GtkTextIter *close_pos, char close_char);
 void find_matching_closing_bracket(GtkTextBuffer *buffer, GtkTextIter *open_pos, char open_char);
+void apply_font_size_to_selection(GtkTextBuffer *buffer, int font_size);
 
 #endif /* GUI_H */
