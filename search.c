@@ -19,7 +19,7 @@ static void compute_lps(const char *pattern, int *lps) {
 SearchResults kmp_search(const char *pattern, Piecetable pt) {
     SearchResults results = {0};
     char *text = piecetable_value(pt);
-    if (!text) return results; // Defensive: handle NULL
+    if (!text) return results; // handle NULL
     int M = strlen(pattern);
     int N = strlen(text);
 
@@ -31,7 +31,7 @@ SearchResults kmp_search(const char *pattern, Piecetable pt) {
     int *lps = malloc(M * sizeof(int));
     compute_lps(pattern, lps);
 
-    int *matches = malloc(N * sizeof(int)); // FIXED: allocate for all possible matches
+    int *matches = malloc(N * sizeof(int)); //allocate for all possible matches
     int count = 0;
 
     int i = 0, j = 0;

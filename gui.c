@@ -13,7 +13,7 @@ static char *current_filename = NULL; // Tracks the current opened/saved file
 GtkWidget *text_view = NULL;
 GtkWidget *search_bar = NULL;
 GtkWidget *search_entry = NULL;
-
+GtkWidget *replace_entry = NULL;
 Piecetable doc_piecetable = NULL;
 UndoRedoStack *undo_stack = NULL;
 
@@ -368,6 +368,50 @@ void on_search_bar_close(GtkSearchBar *search_bar, gpointer user_data) {
     gtk_search_bar_set_search_mode(search_bar, FALSE);
 }
 
+
+void on_replace_clicked(GtkWidget *widget, gpointer user_data) {
+    GtkEntry *replace_entry_local = GTK_ENTRY(user_data);
+    const gchar *replace_text = gtk_entry_get_text(replace_entry_local);
+
+    if (current_results.count == 0 || current_match < 0) return;
+
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+    int match_offset = current_results.indices[current_match];
+    int match_length = strlen(gtk_entry_get_text(GTK_ENTRY(search_entry)));
+
+    GtkTextIter start, end;
+    gtk_text_buffer_get_iter_at_offset(buffer, &start, match_offset);
+    end = start;
+    gtk_text_iter_forward_chars(&end, match_length);
+
+    gtk_text_buffer_delete(buffer, &start, &end);
+    gtk_text_buffer_insert(buffer, &start, replace_text, -1);
+
+    // Refresh search results after replacement
+    on_search_text_changed(GTK_ENTRY(search_entry), NULL);
+}
+
+void on_replace_all_clicked(GtkWidget *widget, gpointer user_data) {
+    GtkEntry *replace_entry_local = GTK_ENTRY(user_data);
+    const gchar *replace_text = gtk_entry_get_text(replace_entry_local);
+    const gchar *search_text = gtk_entry_get_text(GTK_ENTRY(search_entry));
+
+    if (!search_text || strlen(search_text) == 0) return;
+
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+    GtkTextIter start, match_start, match_end;
+    gtk_text_buffer_get_start_iter(buffer, &start);
+
+    while (gtk_text_iter_forward_search(&start, search_text, GTK_TEXT_SEARCH_VISIBLE_ONLY, &match_start, &match_end, NULL)) {
+        gtk_text_buffer_delete(buffer, &match_start, &match_end);
+        gtk_text_buffer_insert(buffer, &match_start, replace_text, -1);
+        // Move start to after the replaced text
+        start = match_start;
+        gtk_text_iter_forward_chars(&start, strlen(replace_text));
+    }
+    // Refresh search results
+    on_search_text_changed(GTK_ENTRY(search_entry), NULL);
+}
 
 
 // --- Key Press Handler (Undo/Redo, Bracket Auto-close, Search) ---

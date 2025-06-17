@@ -122,6 +122,17 @@ int main(int argc, char *argv[])
     gtk_search_bar_set_show_close_button(GTK_SEARCH_BAR(search_bar), TRUE);
     g_signal_connect(search_bar, "close", G_CALLBACK(on_search_bar_close), NULL);
 
+    replace_entry = gtk_entry_new();
+    GtkWidget *replace_button = gtk_button_new_with_label("Replace");
+    GtkWidget *replace_all_button = gtk_button_new_with_label("Replace All");
+
+    gtk_box_pack_start(GTK_BOX(search_box), replace_entry, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(search_box), replace_button, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(search_box), replace_all_button, FALSE, FALSE, 0);
+
+    g_signal_connect(replace_button, "clicked", G_CALLBACK(on_replace_clicked), replace_entry);
+    g_signal_connect(replace_all_button, "clicked", G_CALLBACK(on_replace_all_clicked), replace_entry);
+
     // --- Text view and scroll ---
     text_view = gtk_text_view_new();
     gtk_widget_set_name(text_view, "editor_view");
