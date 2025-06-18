@@ -23,32 +23,477 @@ static char *prev_text = NULL;
 static int current_font_size = 12; // Default font size
 static GtkCssProvider *zoom_css_provider = NULL;
 
-// Helper to apply the current font size to the text view
-void apply_textview_font_size(int font_size) {
-    if (!zoom_css_provider)
-        zoom_css_provider = gtk_css_provider_new();
+// -----Font Management------
+static char *current_font_family = NULL;
+static gboolean font_bold = FALSE;
+static gboolean font_italic = FALSE;
+static GtkCssProvider *font_css_provider = NULL;
 
-    char css[128];
+// Initialize default font
+void initialize_font_system() {
+    if (!current_font_family) {
+        current_font_family = g_strdup("Monospace");
+    }
+    if (!font_css_provider) {
+        font_css_provider = gtk_css_provider_new();
+    }
+    apply_current_font();
+}
+
+
+// Add these functions to your gui.c file
+
+// --- Individual Text Formatting Functions ---
+
+// Apply formatting to selected text or at cursor position
+void apply_formatting_to_selection(const char *tag_name, const char *property, const char *value) {
+    if (!text_view) return;
+    
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+    GtkTextIter start, end;
+    gboolean has_selection;
+    
+    // Check if there's a selection
+    has_selection = gtk_text_buffer_get_selection_bounds(buffer, &start, &end);
+    
+    if (has_selection) {
+        // Apply to selection
+        GtkTextTag *tag = gtk_text_buffer_create_tag(buffer, NULL, property, value, NULL);
+        gtk_text_buffer_apply_tag(buffer, tag, &start, &end);
+    } else {
+        // No selection - create a tag for future typing
+        GtkTextMark *cursor = gtk_text_buffer_get_insert(buffer);
+        gtk_text_buffer_get_iter_at_mark(buffer, &start, cursor);
+        
+        GtkTextTag *tag = gtk_text_buffer_create_tag(buffer, NULL, property, value, NULL);
+        // Store tag for current typing position
+        g_object_set_data(G_OBJECT(buffer), "current_format_tag", tag);
+    }
+}
+
+// Font family for selection
+void apply_font_family_to_selection(const char *family) {
+    apply_formatting_to_selection(NULL, "family", family);
+}
+
+// Font size for selection
+void apply_font_size_to_selection_new(int size) {
+    char size_str[16];
+    snprintf(size_str, sizeof(size_str), "%d", size * PANGO_SCALE);
+    apply_formatting_to_selection(NULL, "size", size_str);
+}
+
+// Bold for selection
+void apply_bold_to_selection() {
+    if (!text_view) return;
+    
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+    GtkTextIter start, end;
+    gboolean has_selection;
+    
+    has_selection = gtk_text_buffer_get_selection_bounds(buffer, &start, &end);
+    
+    if (has_selection) {
+        // Check if selection is already bold
+        GtkTextTag *bold_tag = NULL;
+        
+        // Look for existing bold tag
+        GSList *tags = gtk_text_iter_get_tags(&start);
+        for (GSList *l = tags; l != NULL; l = l->next) {
+            GtkTextTag *tag = GTK_TEXT_TAG(l->data);
+            gboolean is_bold;
+            g_object_get(tag, "weight-set", &is_bold, NULL);
+            if (is_bold) {
+                PangoWeight weight;
+                g_object_get(tag, "weight", &weight, NULL);
+                if (weight >= PANGO_WEIGHT_BOLD) {
+                    bold_tag = tag;
+                    break;
+                }
+            }
+        }
+        g_slist_free(tags);
+        
+        if (bold_tag) {
+            // Remove bold
+            gtk_text_buffer_remove_tag(buffer, bold_tag, &start, &end);
+        } else {
+            // Add bold
+            GtkTextTag *tag = gtk_text_buffer_create_tag(buffer, NULL, 
+                "weight", PANGO_WEIGHT_BOLD, NULL);
+            gtk_text_buffer_apply_tag(buffer, tag, &start, &end);
+        }
+    }
+}
+
+// Italic for selection
+void apply_italic_to_selection() {
+    if (!text_view) return;
+    
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+    GtkTextIter start, end;
+    gboolean has_selection;
+    
+    has_selection = gtk_text_buffer_get_selection_bounds(buffer, &start, &end);
+    
+    if (has_selection) {
+        // Check if selection is already italic
+        GtkTextTag *italic_tag = NULL;
+        
+        GSList *tags = gtk_text_iter_get_tags(&start);
+        for (GSList *l = tags; l != NULL; l = l->next) {
+            GtkTextTag *tag = GTK_TEXT_TAG(l->data);
+            gboolean is_italic;
+            g_object_get(tag, "style-set", &is_italic, NULL);
+            if (is_italic) {
+                PangoStyle style;
+                g_object_get(tag, "style", &style, NULL);
+                if (style == PANGO_STYLE_ITALIC || style == PANGO_STYLE_OBLIQUE) {
+                    italic_tag = tag;
+                    break;
+                }
+            }
+        }
+        g_slist_free(tags);
+        
+        if (italic_tag) {
+            // Remove italic
+            gtk_text_buffer_remove_tag(buffer, italic_tag, &start, &end);
+        } else {
+            // Add italic
+            GtkTextTag *tag = gtk_text_buffer_create_tag(buffer, NULL, 
+                "style", PANGO_STYLE_ITALIC, NULL);
+            gtk_text_buffer_apply_tag(buffer, tag, &start, &end);
+        }
+    }
+}
+
+// Color for selection
+void apply_color_to_selection(const char *color) {
+    apply_formatting_to_selection(NULL, "foreground", color);
+}
+
+// Background color for selection
+void apply_background_to_selection(const char *color) {
+    apply_formatting_to_selection(NULL, "background", color);
+}
+
+// Remove all formatting from selection
+void clear_formatting_from_selection() {
+    if (!text_view) return;
+    
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+    GtkTextIter start, end;
+    gboolean has_selection;
+    
+    has_selection = gtk_text_buffer_get_selection_bounds(buffer, &start, &end);
+    
+    if (has_selection) {
+        gtk_text_buffer_remove_all_tags(buffer, &start, &end);
+    }
+}
+
+// Individual text formatting callback functions
+void on_selection_font_monospace(GtkWidget *widget, gpointer data) {
+    apply_font_family_to_selection("Monospace");
+}
+
+void on_selection_font_serif(GtkWidget *widget, gpointer data) {
+    apply_font_family_to_selection("Serif");
+}
+
+void on_selection_font_sans_serif(GtkWidget *widget, gpointer data) {
+    apply_font_family_to_selection("Sans");
+}
+
+void on_selection_font_courier(GtkWidget *widget, gpointer data) {
+    apply_font_family_to_selection("Courier New");
+}
+
+void on_selection_font_times(GtkWidget *widget, gpointer data) {
+    apply_font_family_to_selection("Times New Roman");
+}
+
+void on_selection_font_arial(GtkWidget *widget, gpointer data) {
+    apply_font_family_to_selection("Arial");
+}
+
+void on_selection_bold(GtkWidget *widget, gpointer data) {
+    apply_bold_to_selection();
+}
+
+void on_selection_italic(GtkWidget *widget, gpointer data) {
+    apply_italic_to_selection();
+}
+
+void on_selection_font_size_8(GtkWidget *widget, gpointer data) {
+    apply_font_size_to_selection_new(8);
+}
+
+void on_selection_font_size_10(GtkWidget *widget, gpointer data) {
+    apply_font_size_to_selection_new(10);
+}
+
+void on_selection_font_size_12(GtkWidget *widget, gpointer data) {
+    apply_font_size_to_selection_new(12);
+}
+
+void on_selection_font_size_14(GtkWidget *widget, gpointer data) {
+    apply_font_size_to_selection_new(14);
+}
+
+void on_selection_font_size_16(GtkWidget *widget, gpointer data) {
+    apply_font_size_to_selection_new(16);
+}
+
+void on_selection_font_size_18(GtkWidget *widget, gpointer data) {
+    apply_font_size_to_selection_new(18);
+}
+
+void on_selection_font_size_24(GtkWidget *widget, gpointer data) {
+    apply_font_size_to_selection_new(24);
+}
+
+void on_selection_font_size_36(GtkWidget *widget, gpointer data) {
+    apply_font_size_to_selection_new(36);
+}
+
+void on_clear_formatting(GtkWidget *widget, gpointer data) {
+    clear_formatting_from_selection();
+}
+
+// Color selection dialog
+void on_selection_color_dialog(GtkWidget *widget, gpointer window) {
+    GtkWidget *dialog = gtk_color_chooser_dialog_new("Choose Text Color", GTK_WINDOW(window));
+    
+    gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+    if (response == GTK_RESPONSE_OK) {
+        GdkRGBA color;
+        gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(dialog), &color);
+        
+        char color_str[32];
+        snprintf(color_str, sizeof(color_str), "rgba(%d,%d,%d,%.2f)",
+                (int)(color.red * 255),
+                (int)(color.green * 255),
+                (int)(color.blue * 255),
+                color.alpha);
+        
+        apply_color_to_selection(color_str);
+    }
+    
+    gtk_widget_destroy(dialog);
+}
+
+// Background color selection dialog
+void on_selection_background_dialog(GtkWidget *widget, gpointer window) {
+    GtkWidget *dialog = gtk_color_chooser_dialog_new("Choose Background Color", GTK_WINDOW(window));
+    
+    gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+    if (response == GTK_RESPONSE_OK) {
+        GdkRGBA color;
+        gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(dialog), &color);
+        
+        char color_str[32];
+        snprintf(color_str, sizeof(color_str), "rgba(%d,%d,%d,%.2f)",
+                (int)(color.red * 255),
+                (int)(color.green * 255),
+                (int)(color.blue * 255),
+                color.alpha);
+        
+        apply_background_to_selection(color_str);
+    }
+    
+    gtk_widget_destroy(dialog);
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Font dialog callback
+void on_font_dialog_response(GtkDialog *dialog, gint response_id, gpointer user_data) {
+    if (response_id == GTK_RESPONSE_OK) {
+        GtkFontChooser *chooser = GTK_FONT_CHOOSER(dialog);
+        PangoFontDescription *font_desc = gtk_font_chooser_get_font_desc(chooser);
+        
+        if (font_desc) {
+            // Extract font family
+            const char *family = pango_font_description_get_family(font_desc);
+            if (family) {
+                g_free(current_font_family);
+                current_font_family = g_strdup(family);
+            }
+            
+            // Extract font size
+            int size = pango_font_description_get_size(font_desc);
+            if (size > 0) {
+                current_font_size = size / PANGO_SCALE;
+                if (current_font_size < 6) current_font_size = 6;
+                if (current_font_size > 72) current_font_size = 72;
+            }
+            
+            // Extract font weight and style
+            PangoWeight weight = pango_font_description_get_weight(font_desc);
+            font_bold = (weight >= PANGO_WEIGHT_BOLD);
+            
+            PangoStyle style = pango_font_description_get_style(font_desc);
+            font_italic = (style == PANGO_STYLE_ITALIC || style == PANGO_STYLE_OBLIQUE);
+            
+            apply_current_font();
+            pango_font_description_free(font_desc);
+        }
+    }
+    gtk_widget_destroy(GTK_WIDGET(dialog));
+}
+
+// Show font selection dialog
+void show_font_dialog(GtkWidget *widget, gpointer window) {
+    GtkWidget *dialog = gtk_font_chooser_dialog_new("Select Font", GTK_WINDOW(window));
+    
+    // Set current font
+    char font_string[256];
+    snprintf(font_string, sizeof(font_string), "%s %s%s%d",
+             current_font_family ? current_font_family : "Monospace",
+             font_bold ? "Bold " : "",
+             font_italic ? "Italic " : "",
+             current_font_size);
+    
+    gtk_font_chooser_set_font(GTK_FONT_CHOOSER(dialog), font_string);
+    
+    g_signal_connect(dialog, "response", G_CALLBACK(on_font_dialog_response), NULL);
+    gtk_widget_show(dialog);
+}
+
+// Quick font family change functions
+void change_font_family(const char *family) {
+    if (current_font_family) g_free(current_font_family);
+    current_font_family = g_strdup(family);
+    apply_current_font();
+}
+
+void on_font_monospace(GtkWidget *widget, gpointer data) {
+    change_font_family("Monospace");
+}
+
+void on_font_serif(GtkWidget *widget, gpointer data) {
+    change_font_family("Serif");
+}
+
+void on_font_sans_serif(GtkWidget *widget, gpointer data) {
+    change_font_family("Sans");
+}
+
+void on_font_courier(GtkWidget *widget, gpointer data) {
+    change_font_family("Courier New");
+}
+
+void on_font_times(GtkWidget *widget, gpointer data) {
+    change_font_family("Times New Roman");
+}
+
+void on_font_arial(GtkWidget *widget, gpointer data) {
+    change_font_family("Arial");
+}
+
+// Font style toggles
+void on_toggle_bold(GtkWidget *widget, gpointer data) {
+    font_bold = !font_bold;
+    apply_current_font();
+}
+
+void on_toggle_italic(GtkWidget *widget, gpointer data) {
+    font_italic = !font_italic;
+    apply_current_font();
+}
+
+// Font size presets
+void set_font_size(int size) {
+    if (size >= 6 && size <= 72) {
+        current_font_size = size;
+        apply_current_font();
+    }
+}
+// Improved version of apply_current_font() function
+void apply_current_font() {
+    if (!text_view) {
+        g_warning("text_view is NULL in apply_current_font");
+        return;
+    }
+
+    if (!font_css_provider) {
+        font_css_provider = gtk_css_provider_new();
+    }
+
+    char css[512];
+    char weight[16] = "normal";
+    char style[16] = "normal";
+    
+    if (font_bold) strcpy(weight, "bold");
+    if (font_italic) strcpy(style, "italic");
+
+    // Create CSS rule
     snprintf(css, sizeof(css),
-             "textview { font-size: %dpt; }", font_size);
+             "textview { font-family: \"%s\"; font-size: %dpt; font-weight: %s; font-style: %s; }",
+             current_font_family ? current_font_family : "Monospace",
+             current_font_size,
+             weight,
+             style);
 
-    gtk_css_provider_load_from_data(zoom_css_provider, css, -1, NULL);
+    // Load CSS
+    GError *error = NULL;
+    if (!gtk_css_provider_load_from_data(font_css_provider, css, -1, &error)) {
+        g_warning("Failed to load CSS: %s", error ? error->message : "Unknown error");
+        if (error) g_error_free(error);
+        return;
+    }
 
+    // Apply to text view
     GtkStyleContext *context = gtk_widget_get_style_context(text_view);
+    
+    // Remove previous provider if it exists
+    gtk_style_context_remove_provider(context, GTK_STYLE_PROVIDER(font_css_provider));
+    
+    // Add new provider
     gtk_style_context_add_provider(context,
-        GTK_STYLE_PROVIDER(zoom_css_provider),
+        GTK_STYLE_PROVIDER(font_css_provider),
         GTK_STYLE_PROVIDER_PRIORITY_USER);
+
+    // Also add to default screen for broader compatibility
+    GdkScreen *screen = gtk_widget_get_screen(text_view);
+    if (screen) {
+        gtk_style_context_add_provider_for_screen(screen,
+            GTK_STYLE_PROVIDER(font_css_provider),
+            GTK_STYLE_PROVIDER_PRIORITY_USER);
+    }
+
+    // Force a redraw
+    gtk_widget_queue_draw(text_view);
+    
+    g_print("Applied font: %s %dpt %s %s\n", 
+            current_font_family ? current_font_family : "Monospace",
+            current_font_size, weight, style);
+}
+void on_font_size_8(GtkWidget *widget, gpointer data) { set_font_size(8); }
+void on_font_size_10(GtkWidget *widget, gpointer data) { set_font_size(10); }
+void on_font_size_12(GtkWidget *widget, gpointer data) { set_font_size(12); }
+void on_font_size_14(GtkWidget *widget, gpointer data) { set_font_size(14); }
+void on_font_size_16(GtkWidget *widget, gpointer data) { set_font_size(16); }
+void on_font_size_18(GtkWidget *widget, gpointer data) { set_font_size(18); }
+void on_font_size_24(GtkWidget *widget, gpointer data) { set_font_size(24); }
+void on_font_size_36(GtkWidget *widget, gpointer data) { set_font_size(36); }
+
+// Legacy zoom functions (now use font system)
+void apply_textview_font_size(int font_size) {
+    current_font_size = font_size;
+    apply_current_font();
 }
 
 void initialize_textview_font_size() {
-    apply_textview_font_size(current_font_size);
+    initialize_font_system();
 }
 
 // Handler for Zoom In
 void on_zoom_in(GtkWidget *widget, gpointer data) {
     if (current_font_size < 48) { // Max font size
         current_font_size += 2;
-        apply_textview_font_size(current_font_size);
+        apply_current_font();
     }
 }
 
@@ -56,7 +501,7 @@ void on_zoom_in(GtkWidget *widget, gpointer data) {
 void on_zoom_out(GtkWidget *widget, gpointer data) {
     if (current_font_size > 6) { // Min font size
         current_font_size -= 2;
-        apply_textview_font_size(current_font_size);
+        apply_current_font();
     }
 }
 
@@ -119,6 +564,7 @@ void on_redo(GtkWidget *widget, gpointer data) {
         g_signal_handlers_unblock_by_func(buffer, on_buffer_changed, NULL);
     }
 }
+
 // This is done to select text for individual font size change
 void apply_font_size_to_selection(GtkTextBuffer *buffer, int font_size) {
     GtkTextIter start, end;
@@ -142,7 +588,6 @@ void apply_font_size_to_selection(GtkTextBuffer *buffer, int font_size) {
 
     gtk_text_buffer_apply_tag(buffer, tag, &start, &end);
 }
-
 
 void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
     update_piece_table_from_buffer();
@@ -197,8 +642,6 @@ void on_new(GtkWidget *widget, gpointer data) {
 
     gtk_widget_destroy(dialog);
 }
-
-
 
 void on_open(GtkWidget *widget, gpointer window) {
     GtkWidget *dialog;
@@ -287,12 +730,13 @@ void on_save(GtkWidget *widget, gpointer window) {
     g_free(text);
 }
 
-
 void on_quit(GtkWidget *widget, gpointer data) {
     if (doc_piecetable != NULL)
         piecetable_free(doc_piecetable);
     if (undo_stack != NULL)
         undo_redo_stack_free(undo_stack);
+    if (current_font_family)
+        g_free(current_font_family);
     gtk_main_quit();
 }
 
@@ -363,11 +807,9 @@ void on_previous_match(GtkWidget *widget, gpointer data) {
     gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(text_view), &match_start, 0.0, FALSE, 0.0, 0.0);
 }
 
-
 void on_search_bar_close(GtkSearchBar *search_bar, gpointer user_data) {
     gtk_search_bar_set_search_mode(search_bar, FALSE);
 }
-
 
 void on_replace_clicked(GtkWidget *widget, gpointer user_data) {
     GtkEntry *replace_entry_local = GTK_ENTRY(user_data);
@@ -412,7 +854,6 @@ void on_replace_all_clicked(GtkWidget *widget, gpointer user_data) {
     // Refresh search results
     on_search_text_changed(GTK_ENTRY(search_entry), NULL);
 }
-
 
 // --- Key Press Handler (Undo/Redo, Bracket Auto-close, Search) ---
 
@@ -464,51 +905,58 @@ gboolean on_text_view_key_press(GtkWidget *widget, GdkEventKey *event, gpointer 
 
     // Ctrl+S: Save
     if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_s)) {
-    on_save(NULL, gtk_widget_get_toplevel(widget));
-    return TRUE;
+        on_save(NULL, gtk_widget_get_toplevel(widget));
+        return TRUE;
     }
 
-        // Ctrl+1 → font size 10
-if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_1)) {
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
-    apply_font_size_to_selection(buffer, 10);
-    return TRUE;
-}
+    // Ctrl+B: Toggle Bold
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_b)) {
+        on_toggle_bold(NULL, NULL);
+        return TRUE;
+    }
 
-// Ctrl+2 → font size 15
-if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_2)) {
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
-    apply_font_size_to_selection(buffer, 15);
-    return TRUE;
-}
+    // Ctrl+I: Toggle Italic
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_i)) {
+        on_toggle_italic(NULL, NULL);
+        return TRUE;
+    }
 
-// Ctrl+3 → font size 20
-if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_3)) {
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
-    apply_font_size_to_selection(buffer, 20);
-    return TRUE;
-}
+    // Font size shortcuts (Ctrl+1 through Ctrl+9)
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_1)) {
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+        apply_font_size_to_selection(buffer, 10);
+        return TRUE;
+    }
 
-// Ctrl+4 → font size 30
-if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_4)) {
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
-    apply_font_size_to_selection(buffer, 30);
-    return TRUE;
-}
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_2)) {
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+        apply_font_size_to_selection(buffer, 15);
+        return TRUE;
+    }
 
-// Ctrl+5 → font size 40
-if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_5)) {
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
-    apply_font_size_to_selection(buffer, 30);
-    return TRUE;
-}
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_3)) {
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+        apply_font_size_to_selection(buffer, 20);
+        return TRUE;
+    }
 
-// Ctrl+6 → font size 50
-if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_6)) {
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
-    apply_font_size_to_selection(buffer, 50);
-    return TRUE;
-}
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_4)) {
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+        apply_font_size_to_selection(buffer, 30);
+        return TRUE;
+    }
+
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_5)) {
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+        apply_font_size_to_selection(buffer, 40);
+        return TRUE;
+    }
+
+    if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_6)) {
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+        apply_font_size_to_selection(buffer, 50);
+        return TRUE;
+    }
 
 // Ctrl+7 → font size 60
 if ((event->state & GDK_CONTROL_MASK) && (event->keyval == GDK_KEY_7)) {

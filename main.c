@@ -10,13 +10,13 @@
 // Forward declaration
 static void on_color_menu_activate(GtkMenuItem *item, gpointer user_data);
 
-
 int main(int argc, char *argv[])
 {
     GtkWidget *window, *vbox, *menubar;
     GtkWidget *file_menu, *file_item;
     GtkWidget *edit_menu, *edit_item;
     GtkWidget *view_menu, *view_item;
+    GtkWidget *format_menu, *format_item; // Add format menu
     GtkWidget *new_item, *open_item, *save_item, *quit_item;
     GtkWidget *undo_item, *redo_item;
     GtkWidget *zoom_in_item, *zoom_out_item;
@@ -77,6 +77,190 @@ int main(int argc, char *argv[])
     gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), redo_item);
     gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), color_item);
     gtk_menu_shell_append(GTK_MENU_SHELL(menubar), edit_item);
+
+    // --- Format menu (NEW - for fonts) ---
+    format_menu = gtk_menu_new();
+    format_item = gtk_menu_item_new_with_label("Format");
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(format_item), format_menu);
+
+    // Font dialog
+    GtkWidget *font_dialog_item = gtk_menu_item_new_with_label("Font...");
+    g_signal_connect(font_dialog_item, "activate", G_CALLBACK(show_font_dialog), window);
+    gtk_menu_shell_append(GTK_MENU_SHELL(format_menu), font_dialog_item);
+
+    // Separator
+    GtkWidget *separator1 = gtk_separator_menu_item_new();
+    gtk_menu_shell_append(GTK_MENU_SHELL(format_menu), separator1);
+
+    // Font family submenu
+    GtkWidget *font_family_item = gtk_menu_item_new_with_label("Font Family");
+    GtkWidget *font_family_menu = gtk_menu_new();
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(font_family_item), font_family_menu);
+
+    GtkWidget *mono_item = gtk_menu_item_new_with_label("Monospace");
+    GtkWidget *serif_item = gtk_menu_item_new_with_label("Serif");
+    GtkWidget *sans_item = gtk_menu_item_new_with_label("Sans Serif");
+    GtkWidget *courier_item = gtk_menu_item_new_with_label("Courier New");
+    GtkWidget *times_item = gtk_menu_item_new_with_label("Times New Roman");
+    GtkWidget *arial_item = gtk_menu_item_new_with_label("Arial");
+
+    g_signal_connect(mono_item, "activate", G_CALLBACK(on_font_monospace), NULL);
+    g_signal_connect(serif_item, "activate", G_CALLBACK(on_font_serif), NULL);
+    g_signal_connect(sans_item, "activate", G_CALLBACK(on_font_sans_serif), NULL);
+    g_signal_connect(courier_item, "activate", G_CALLBACK(on_font_courier), NULL);
+    g_signal_connect(times_item, "activate", G_CALLBACK(on_font_times), NULL);
+    g_signal_connect(arial_item, "activate", G_CALLBACK(on_font_arial), NULL);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_family_menu), mono_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_family_menu), serif_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_family_menu), sans_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_family_menu), courier_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_family_menu), times_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_family_menu), arial_item);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(format_menu), font_family_item);
+
+    // Font size submenu
+    GtkWidget *font_size_item = gtk_menu_item_new_with_label("Font Size");
+    GtkWidget *font_size_menu = gtk_menu_new();
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(font_size_item), font_size_menu);
+
+    GtkWidget *size8_item = gtk_menu_item_new_with_label("8");
+    GtkWidget *size10_item = gtk_menu_item_new_with_label("10");
+    GtkWidget *size12_item = gtk_menu_item_new_with_label("12");
+    GtkWidget *size14_item = gtk_menu_item_new_with_label("14");
+    GtkWidget *size16_item = gtk_menu_item_new_with_label("16");
+    GtkWidget *size18_item = gtk_menu_item_new_with_label("18");
+    GtkWidget *size24_item = gtk_menu_item_new_with_label("24");
+    GtkWidget *size36_item = gtk_menu_item_new_with_label("36");
+
+    g_signal_connect(size8_item, "activate", G_CALLBACK(on_font_size_8), NULL);
+    g_signal_connect(size10_item, "activate", G_CALLBACK(on_font_size_10), NULL);
+    g_signal_connect(size12_item, "activate", G_CALLBACK(on_font_size_12), NULL);
+    g_signal_connect(size14_item, "activate", G_CALLBACK(on_font_size_14), NULL);
+    g_signal_connect(size16_item, "activate", G_CALLBACK(on_font_size_16), NULL);
+    g_signal_connect(size18_item, "activate", G_CALLBACK(on_font_size_18), NULL);
+    g_signal_connect(size24_item, "activate", G_CALLBACK(on_font_size_24), NULL);
+    g_signal_connect(size36_item, "activate", G_CALLBACK(on_font_size_36), NULL);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_size_menu), size8_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_size_menu), size10_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_size_menu), size12_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_size_menu), size14_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_size_menu), size16_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_size_menu), size18_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_size_menu), size24_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(font_size_menu), size36_item);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(format_menu), font_size_item);
+
+    // Separator
+    GtkWidget *separator2 = gtk_separator_menu_item_new();
+    gtk_menu_shell_append(GTK_MENU_SHELL(format_menu), separator2);
+
+    // Font style toggles
+    GtkWidget *bold_item = gtk_menu_item_new_with_label("Toggle Bold");
+    GtkWidget *italic_item = gtk_menu_item_new_with_label("Toggle Italic");
+
+    g_signal_connect(bold_item, "activate", G_CALLBACK(on_toggle_bold), NULL);
+    g_signal_connect(italic_item, "activate", G_CALLBACK(on_toggle_italic), NULL);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(format_menu), bold_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(format_menu), italic_item);
+
+    // Separator
+    GtkWidget *separator3 = gtk_separator_menu_item_new();
+    gtk_menu_shell_append(GTK_MENU_SHELL(format_menu), separator3);
+
+    // --- Selection formatting submenu ---
+    GtkWidget *selection_item = gtk_menu_item_new_with_label("Format Selection");
+    GtkWidget *selection_menu = gtk_menu_new();
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(selection_item), selection_menu);
+
+    // Selection font family
+    GtkWidget *sel_font_family_item = gtk_menu_item_new_with_label("Font Family");
+    GtkWidget *sel_font_family_menu = gtk_menu_new();
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(sel_font_family_item), sel_font_family_menu);
+
+    GtkWidget *sel_mono_item = gtk_menu_item_new_with_label("Monospace");
+    GtkWidget *sel_serif_item = gtk_menu_item_new_with_label("Serif");
+    GtkWidget *sel_sans_item = gtk_menu_item_new_with_label("Sans Serif");
+    GtkWidget *sel_courier_item = gtk_menu_item_new_with_label("Courier New");
+    GtkWidget *sel_times_item = gtk_menu_item_new_with_label("Times New Roman");
+    GtkWidget *sel_arial_item = gtk_menu_item_new_with_label("Arial");
+
+    g_signal_connect(sel_mono_item, "activate", G_CALLBACK(on_selection_font_monospace), NULL);
+    g_signal_connect(sel_serif_item, "activate", G_CALLBACK(on_selection_font_serif), NULL);
+    g_signal_connect(sel_sans_item, "activate", G_CALLBACK(on_selection_font_sans_serif), NULL);
+    g_signal_connect(sel_courier_item, "activate", G_CALLBACK(on_selection_font_courier), NULL);
+    g_signal_connect(sel_times_item, "activate", G_CALLBACK(on_selection_font_times), NULL);
+    g_signal_connect(sel_arial_item, "activate", G_CALLBACK(on_selection_font_arial), NULL);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_family_menu), sel_mono_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_family_menu), sel_serif_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_family_menu), sel_sans_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_family_menu), sel_courier_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_family_menu), sel_times_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_family_menu), sel_arial_item);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(selection_menu), sel_font_family_item);
+
+    // Selection font size
+    GtkWidget *sel_font_size_item = gtk_menu_item_new_with_label("Font Size");
+    GtkWidget *sel_font_size_menu = gtk_menu_new();
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(sel_font_size_item), sel_font_size_menu);
+
+    GtkWidget *sel_size8_item = gtk_menu_item_new_with_label("8");
+    GtkWidget *sel_size10_item = gtk_menu_item_new_with_label("10");
+    GtkWidget *sel_size12_item = gtk_menu_item_new_with_label("12");
+    GtkWidget *sel_size14_item = gtk_menu_item_new_with_label("14");
+    GtkWidget *sel_size16_item = gtk_menu_item_new_with_label("16");
+    GtkWidget *sel_size18_item = gtk_menu_item_new_with_label("18");
+    GtkWidget *sel_size24_item = gtk_menu_item_new_with_label("24");
+    GtkWidget *sel_size36_item = gtk_menu_item_new_with_label("36");
+
+    g_signal_connect(sel_size8_item, "activate", G_CALLBACK(on_selection_font_size_8), NULL);
+    g_signal_connect(sel_size10_item, "activate", G_CALLBACK(on_selection_font_size_10), NULL);
+    g_signal_connect(sel_size12_item, "activate", G_CALLBACK(on_selection_font_size_12), NULL);
+    g_signal_connect(sel_size14_item, "activate", G_CALLBACK(on_selection_font_size_14), NULL);
+    g_signal_connect(sel_size16_item, "activate", G_CALLBACK(on_selection_font_size_16), NULL);
+    g_signal_connect(sel_size18_item, "activate", G_CALLBACK(on_selection_font_size_18), NULL);
+    g_signal_connect(sel_size24_item, "activate", G_CALLBACK(on_selection_font_size_24), NULL);
+    g_signal_connect(sel_size36_item, "activate", G_CALLBACK(on_selection_font_size_36), NULL);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_size_menu), sel_size8_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_size_menu), sel_size10_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_size_menu), sel_size12_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_size_menu), sel_size14_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_size_menu), sel_size16_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_size_menu), sel_size18_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_size_menu), sel_size24_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(sel_font_size_menu), sel_size36_item);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(selection_menu), sel_font_size_item);
+
+    // Selection style
+    GtkWidget *sel_bold_item = gtk_menu_item_new_with_label("Toggle Bold");
+    GtkWidget *sel_italic_item = gtk_menu_item_new_with_label("Toggle Italic");
+    GtkWidget *sel_color_item = gtk_menu_item_new_with_label("Text Color...");
+    GtkWidget *sel_bg_color_item = gtk_menu_item_new_with_label("Background Color...");
+    GtkWidget *clear_format_item = gtk_menu_item_new_with_label("Clear Formatting");
+
+    g_signal_connect(sel_bold_item, "activate", G_CALLBACK(on_selection_bold), NULL);
+    g_signal_connect(sel_italic_item, "activate", G_CALLBACK(on_selection_italic), NULL);
+    g_signal_connect(sel_color_item, "activate", G_CALLBACK(on_selection_color_dialog), window);
+    g_signal_connect(sel_bg_color_item, "activate", G_CALLBACK(on_selection_background_dialog), window);
+    g_signal_connect(clear_format_item, "activate", G_CALLBACK(on_clear_formatting), NULL);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(selection_menu), sel_bold_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(selection_menu), sel_italic_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(selection_menu), sel_color_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(selection_menu), sel_bg_color_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(selection_menu), clear_format_item);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(format_menu), selection_item);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(menubar), format_item);
 
     // --- View menu (Zoom In/Out) ---
     view_menu = gtk_menu_new();
@@ -163,15 +347,14 @@ int main(int argc, char *argv[])
     GtkTextTag *tag2 = gtk_text_buffer_create_tag(buffer, "bracket_level_2", "foreground", "green", NULL);
     GtkTextTag *tag3 = gtk_text_buffer_create_tag(buffer, "bracket_level_3", "foreground", "orange", NULL);
 
-    // --- Initialize font size for zoom ---
-    initialize_textview_font_size();
+    // --- Initialize font system AFTER text_view is created ---
+    initialize_font_system();
 
     gtk_widget_show_all(window);
     gtk_main();
 
     return 0;
 }
-
 
 static void on_color_menu_activate(GtkMenuItem *item, gpointer user_data)
 {
